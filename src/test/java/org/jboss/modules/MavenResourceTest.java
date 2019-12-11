@@ -69,6 +69,7 @@ public class MavenResourceTest {
     }
 
     @Test
+    @Ignore("https")
     public void testDefaultRepositories() throws Exception {
         try {
             URL settingsXmlUrl = MavenSettingsTest.class.getResource("jboss-settings.xml");

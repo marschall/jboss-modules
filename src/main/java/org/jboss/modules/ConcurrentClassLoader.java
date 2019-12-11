@@ -20,12 +20,16 @@ package org.jboss.modules;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
 import java.security.ProtectionDomain;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -39,6 +43,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public abstract class ConcurrentClassLoader extends NamedClassLoader {
 
     private static final ThreadLocal<Boolean> GET_PACKAGE_SUPPRESSOR = new ThreadLocal<Boolean>();
+
+    private static final Set<String> KNOWN_JFR_CLASSES = new HashSet<>(Arrays.asList("com.github.marschall.jbm.crasher.RunnableEvent"));
 
     static {
         if (! ClassLoader.registerAsParallelCapable()) {
@@ -113,7 +119,21 @@ public abstract class ConcurrentClassLoader extends NamedClassLoader {
      */
     @Override
     public final Class<?> loadClass(final String className) throws ClassNotFoundException {
-        return performLoadClass(className, false, false);
+        if (KNOWN_JFR_CLASSES.contains(className)) {
+            synchronized (getClassLoadingLock(className)) {
+                Class<?> clazz = performLoadClass(className, false, false);
+                try {
+                    Constructor<?> constructor = clazz.getDeclaredConstructor();
+                    constructor.setAccessible(true);
+                    constructor.newInstance();
+                } catch (ReflectiveOperationException e) {
+                    throw new ClassNotFoundException(className, e);
+                }
+                return clazz;
+            }
+        } else {
+            return performLoadClass(className, false, false);
+        }
     }
 
     /**
@@ -125,7 +145,21 @@ public abstract class ConcurrentClassLoader extends NamedClassLoader {
      */
     @Override
     public final Class<?> loadClass(final String className, boolean resolve) throws ClassNotFoundException {
-        return performLoadClass(className, false, resolve);
+        if (KNOWN_JFR_CLASSES.contains(className)) {
+            synchronized (getClassLoadingLock(className)) {
+                Class<?> clazz = performLoadClass(className, false, resolve);
+                try {
+                    Constructor<?> constructor = clazz.getDeclaredConstructor();
+                    constructor.setAccessible(true);
+                    constructor.newInstance();
+                } catch (ReflectiveOperationException e) {
+                    throw new ClassNotFoundException(className, e);
+                }
+                return clazz;
+            }
+        } else {
+            return performLoadClass(className, false, resolve);
+        }
     }
 
     /**
